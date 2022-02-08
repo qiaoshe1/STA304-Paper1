@@ -1,0 +1,225 @@
+---
+title: "Effect of Operating Auspice on Toronto's Child Care Centers: Number of Child Care Spaces, Subsidy, and Choice of Location"
+author: 
+  - Shenghui Qiao
+thanks: "Code and data are available at: https://github.com/qiaoshe1/STA304-Paper1."
+date: "`r format(Sys.time(), '%d %B %Y')`"
+abstract: "Child Care Agencies are licensed under Ministry of Education, Ontario, to provide child additional supports when the child's family is in crisis or great challenge. This report analyzes the 'Licensed Child Care Centres' data from opentoronto portal and discusses some effect that a child care center's operating auspice may have on the center. The results show that child care centers under a Non Profit Agency perform well in comparison to centers under other agencies. This could be important for future planning and regulations on Toronto's child care system."
+output:
+  bookdown::pdf_document2
+toc: FALSE
+bibliography: references.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(opendatatoronto)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(dplyr)
+```
+
+# Introduction
+
+Child care has always been a significant topic for every country and every society. In Canada, the danger of unlicensed child care center was brought into sharp focus in 2013-2014, when four young children died in these unlicensed child care spaces (Ombudsman, 2014). In 2014, the province of Ontario passed The Child Care and Early Years Act (CCEYA) which regulated unlicensed, home-based, and licensed child care providers, proposing health, safety and programming rules that these centers must follow. This new act replaced the Day Nurseries Act which was passed in 1946 with an aim to revise some loopholes of the old act and to create a safe, regulated environment for cared children. 
+
+Child Care Agencies are licensed under Ministry of Education, Ontario. They are established for families (parents/guardians) who “may be experiencing a significant crisis or challenge that requires the child to be in a child care program to reduce stress on the family or to provide the child with additional supports” (_City of Toronto_). Now, Toronto’s licensed child care system has over 1,000 centers and 19 home child care agencies providing early learning and care for children up to 12 years of age (_City of Toronto_). Licensed child care centers in Toronto are categorized into three operating auspices: Non Profit Agency, Commercial Agency, and Public (City Operated) Agency. This report aims to discuss the effect of operating auspice on child care centers, by analyzing _Licensed Child Care Centres_ data in the `opendatatoronto` R package [@citeopendatatoronto]. The effect of an operating auspice is discussed from three perspectives: number of child care spaces for different age group, subsidy program offered to parents, and which types of building that a child care center is located. 
+
+The results confirm previous researches that child care operated with non-profit purpose "is more likely to have high quality than those operated to earn profit" (Canadian Child Care Federation, 1993). This may have a significant implication for further planning and regulation on Ontario's child care system. 
+
+The remainder of this paper is: Section \@ref(data) explains the data. Section \@ref(results) presents general results of data analysis. In Section \@ref(discussion), the effect that operating auspice has on child care centers are discussed in detail, with the use of table and figures. 
+
+
+# Data
+
+This report utilized data on licensed child care centers in Toronto obtained from the City of Toronto [@citelicensedchildcarecentres]. The data contains information of 1036 licensed child care centers in the Toronto area. It provides basic information of the existed licensed child care centers, including center name, address, contact number, operating auspice, geographical location, and whether they offer subsidy to parents. The data also shows the capacity of each licensed child care center by stating the number of wards and the number of child care spaces for each age group (infant 0-18 months, toddler 18-30 months, preschooler 30 months up to grade one, kindergarten, elementary school and up). The data is published by _Children's Services_ and last updated in Feb., 2022. 
+
+The data is obtained from the City of Toronto Open Data Portal, using the `opendatatoronto` package [@citeopendatatoronto]. Throughout the report, the statistical programming language R [@citeR] is used. R packages `tidyverse` [@citetidyverse], `knitr` [@citeknitr], `kableExtra` [@citekableExtra] and `dplyr` [@citedplyr] are used for data cleaning, analysis and discussion.
+
+```{r read_data, echo=FALSE, warning=FALSE, message=FALSE}
+# get package
+package <- show_package("059d37c6-d88b-42fb-b230-ec6a5ec74c24")
+
+# get all resources for this package
+resources <- list_package_resources("059d37c6-d88b-42fb-b230-ec6a5ec74c24")
+
+# identify datastore resources; by default, Toronto Open Data sets datastore resource format to CSV for non-geospatial and GeoJSON for geospatial resources
+datastore_resources <- filter(resources, tolower(format) %in% c('csv', 'geojson'))
+
+# load the first datastore resource as a sample
+child_care_raw <- filter(datastore_resources, row_number()==1) %>% get_resource()
+```
+
+
+In the cleaning session, I removed five variables which only provide basic information of of these child care centers but are unnecessary to further analysis: the address, postal code, ward number, phone number, and name of building where the center is located. For the same reason, I also removed the column _run_day_, which shows the date of the last query to the source system of the data. This variable is simply included for data updating. 
+
+The location id and name of center, however, are kept, because they would be necessary identifiers to distinguish between centers. To more easily identify a center, I assigned a unique number for each child care center by creating a new column called "ID". 
+
+Other important characteristics of child care centers are selected. Firstly, the operating auspice of center, including non-profit, commercial, or public operated, is selected as a key variable for this report. Secondly, five variables that show the number of child care spaces for each age groups of children - infant, toddler, preschooler, kindergarten, elementary and above - as well as a sixth variable, the total number of child care spaces, are kept. Thirdly, a categorical variable subsidy, which indicates whether the center provides subsidy to parents who need extra financial support, is selected. Lastly, the type of building that the center is located is kept to give us some supplementary information of these child care centers. 
+
+```{r cleandata, echo=FALSE, warning=FALSE, message=FALSE}
+# Cleaning Data
+child_care <- child_care_raw %>% 
+  transmute("ID" = seq(1, nrow(child_care_raw), by = 1),
+            LOC_NAME,
+            LOC_ID,
+            AUSPICE,
+            "BUILDING_TYPE"= bldg_type,
+            "INFANT_SPACE" = IGSPACE,
+            "TODDLER_SPACE" = TGSPACE,
+            "PRESCHOOLER_SPACE" = PGSPACE,
+            "KINDERGARTEN_SPACE" = KGSPACE,
+            "ELEMENTARY_SPACE" = SGSPACE,
+            "TOTAL_SPACE" = TOTSPACE,
+            "SUBSIDY" = subsidy) 
+```
+
+Table 1 shows a part of the cleaned data (Table \@ref(tab:dataextract)).
+
+```{r dataextract, echo = FALSE, warning=FALSE}
+knitr::kable(head(child_care), caption = "Cleaned Data of Licensed Child Care Centers", booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "scale_down", "HOLD_position"))
+```
+
+This data is obtained from the official webpage of City of Toronto. Since the Child Care and Early Years Act is passed in 2014, the Ministry of Education in Toronto laid down detailed rules about child care centers. All licensed child care center must report their conditions to the ministry. Therefore, the authenticity and accuracy of this data is likely to be ensured. Besides, the data is refreshed in Feb 2022, meaning that it should include latest up-to-date data, and account for recent change made in these centers (if there is any).
+
+The original data, however, serves an informative role that tells people where and how these centers can be found, rather than collecting data for statisticians to analyze. Therefore, it is inevitable that the original data would contain much background information that are not very helpful with the analysis, and less useful data for statistical analysis. Therefore, this data may not be a full representation of child care center's capacity. It only provides two perspectives for analyzing the center's capacity: number of child care spaces and subsidy program. Other possible aspects, such as health and safety standards, supervision, teachers, etc. are not included. In general, this data has basic information that can be used to assess how well each operating auspice of child care center performs, but a in-depth analysis may require more. 
+
+
+# Results
+
+Licensed child care centers in Toronto can be categorized into three types by their operating auspice: Non-Profit Agency, Commercial Agency, and Public (City Operated) Agency. 
+
+The most common type of operating auspice is non profit agency. Child care centers under non-profit agency has most total child care spaces for every age group. 84.8% non-profit centers offers a subsidy program to families who need additional financial help in the cost of child care. Non-profit centers have great variety in choosing locations and they are located in almost every type of building listed in the data, but most non-profit centers are located in public or Catholic elementary schools.
+
+Commercial agency is the second-common type, and also provides less total child care spaces than centers under non-profit agency do. Most commercial child care centers (73.4%) does not offer a subsidy program. And they tend to be located in High Rise Apartment, House, Peace of Worship, or other locations.
+
+The rarest type is public (city operated) agency. It has least total child care spaces for every age group. However, different from non-profit and commercial centers, all public operated child care center offers a subsidy contract. Public operated centers only locate in limited type of buildings, such as public elementary school and Purpose Built. 
+
+Based on our data, in all 1036 child care centers, 693 of them are operated by non-profit agencies, which constructs 66.9% of the data. 301 centers are operated by commercial agencies, and the rest 42 are operated by city of Toronto (public). This difference in number of centers across auspice is accounted in this report. In comparing numerical variables, not only the total number but also the average number is calculated and compared. The results show that among all five age groups, non-profit child care centers provide most child care spaces to children in elementary school and above: 30.5 spaces per center on average. Both commercial- and public-operated centers offer most spaces to preschooler - 31.2 and 21.9 spaces on average, respectively. Besides, public centers provide the most spaces for infant group (8.9) compared to the other auspices (non-profit: 3.1; commercial: 4.9), filling the gap left by other centers.
+
+
+# Discussion
+
+## The Difference in Child Care Spaces By Operating Auspices
+
+```{r echo = FALSE}
+# Categorize Child Care Centers by Operating Auspices
+non_profit <- child_care %>%
+  filter(AUSPICE == 'Non Profit Agency')
+commercial <- child_care %>%
+  filter(AUSPICE == 'Commercial Agency')
+public <- child_care %>%
+  filter(AUSPICE == 'Public (City Operated) Agency')
+```
+
+Based on the data, the average number of total child care spaces, including all age groups, in a child care center is `r mean(child_care$TOTAL_SPACE)`. Categorizing all centers by their operating auspice, those held by non-profit agencies have an average total space of `r mean(non_profit$TOTAL_SPACE)`, and the average total space for commercially and publicly operated centers are `r mean(commercial$TOTAL_SPACE)` and `r mean(public$TOTAL_SPACE)` respectively. 
+
+Figure \@ref(fig:totalspace) shows the distribution of total child care spaces. The figure shows two facts. Firstly, most centers in Toronto have a total spaces between 0 and 100; some larger centers have more than 100, even more than 200 spaces, but it is very rare for centers to have more than 300 child care spaces in total. Secondly, non-profit centers are not only the most common type of child care choice in Toronto, but also tend to have the largest space compared to their counterparts. Most centers, as displayed in figure \@ref(fig:totalspace), that exceeds 100 child care spaces are operated by non-profit agencies. The only 2 centers that have more than 300 spaces are both non-profit. 
+
+```{r ,fig.cap = "\\label{fig:totalspace}Total Number of Child Care Spaces Across Operating Auspices", echo=FALSE, warning=FALSE, message=FALSE}
+child_care %>% 
+  ggplot(aes(x = TOTAL_SPACE, fill = AUSPICE)) +
+  geom_histogram(colour = "#e9ecef", alpha = 0.7) +
+  labs(x = "Total Number of Child Care Spaces",
+       y = "")
+```
+
+\newpage 
+
+Then, we can look at sub-types: spaces for each age group across auspices. To have a overall understanding of how many child care spaces there are for each age group, I created figure \@ref(fig:subtype) by obtaining the sum of each age group (infant, toddler, preschooler, kindergarten, elementary+), regarding center's operating auspice. Figure \@ref(fig:subtype) will give us a general idea of which type of auspice provides the most spaces for each specific age group in Toronto. The overall number of centers in each auspice, however, will have an significant effect on the result displayed in the figure. 
+
+```{r , fig.cap = "\\label{fig:subtype}Number of Children Care Spaces for Different Age Groups", echo=FALSE, warning=FALSE, message=FALSE}
+
+np <- c(sum(non_profit$INFANT_SPACE), sum(non_profit$TODDLER_SPACE), sum(non_profit$PRESCHOOLER_SPACE), sum(non_profit$KINDERGARTEN_SPACE), sum(non_profit$ELEMENTARY_SPACE))
+
+com <- c(sum(commercial$INFANT_SPACE), sum(commercial$TODDLER_SPACE), sum(commercial$PRESCHOOLER_SPACE), sum(commercial$KINDERGARTEN_SPACE), sum(commercial$ELEMENTARY_SPACE))
+
+pub <- c(sum(public$INFANT_SPACE), sum(public$TODDLER_SPACE), sum(public$PRESCHOOLER_SPACE), sum(public$KINDERGARTEN_SPACE), sum(public$ELEMENTARY_SPACE))
+
+data_ggp <- data.frame(x = c("Infant", "Toddler", "Preschooler", "Kindergarten", "Elementary+"),
+                       y = c(np, com, pub),
+                       AUSPICE = c(rep("Non Profit Agency",5) , rep("Commercial Agency",5), rep("Public (City Operated) Agency", 5)))
+
+data_ggp %>% 
+  ggplot(aes(x, y, colour = AUSPICE)) +
+  geom_point(size = 3) +
+  labs(x = 'Type of Children Age Groups',
+       y = 'Number of Spaces')
+```
+
+For commercial-agency-operated child care centers, there are relatively less spaces for elementary+, infant and kindergarten. These centers focus on providing care for toddlers and preschoolers. Non-profit child care centers have the most spaces in every sub-category, presumably because the number of non-profit centers is the largest. Except for that of infant, the number of spaces for toddler, kindergarten, preschool and elementary are way greater than number of spaces in other type of centers. And total number of child care space for children in elementary school and above reaches surprising 21150. Public (City Operated) Agency has the least space for all age groups, which could also be due to its disadvantage in number of centers. Among all age groups, the space for preschoolers is slightly higher than that for other types. 
+
+Considering the effect of number of centers, I then calculated the average number of child care space across age groups. Table \@ref(tab:average) shows the results.
+
+```{r average, echo=FALSE, warning=FALSE, message=FALSE}
+
+average <- data.frame("Age Group" = c("Infant", "Toddler", "Preschooler", "Kindergarten", "Elementary+"),
+                      "Non Profit" = np/nrow(non_profit),
+                      "Commercial"= com/nrow(commercial), 
+                      "Public" = pub/nrow(public))
+
+knitr::kable(average, caption = "Table 2. Mean Spaces for Each Age Group, Across Auspice", booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "HOLD_position"))
+```
+
+The average number provides a more accurate and objective perspective to understand which age groups that each agency is more concerned. Non Profit Agency, although has most spaces in total for each age group, tends to provide more spaces for preschooler, kindergarten and elementary+ children, while paying less attention to infant and toddler. In contrast, Commercial Agency provides way less space for kindergarten and elementary+ children, but more spaces for toddler (14.6) and preschooler (31.2, the greatest number in three auspices). The gap in spaces for infant and toddler is filled by Public Agency. While non-profit and commercial centers only provides approximately 3.1 and 4.9 spaces for infants on average, each public center provides about 8.9 spaces on average. But public centers tend to focus less on kindergarten and elementary+ spaces, providing only about 2 and 2.5 spaces on average. 
+
+
+## Difference in Fee Subsidy By Operating Auspice
+
+Another indicator of child care center's capacity is whether it provides fee subsidy to families that needs help in cost of child care. A family who meets certain criteria can apply for the fee subsidy to obtain a reduction in cost of child care. The subsidy contract, however, is not provided by all centers. 
+
+Figure \@ref(fig:subsidy) shows the percentage of having a subsidy contract to each type of auspice. It is worth noticing that most commercial centers (73.4%) do not offer such program, while most non-profit centers (84.8%) offer it. The reason could be related to the additional cost to the child care center associated with subsidy program. According to Friesen and Bruce K., "non-profit programs are required to reinvest any 'profit' back into the program", while the owners of for-profit programs can choose to either "reinvest it back into the organization or keep some or all of it for their private use" (Friesen, Bruce K., 1958). Therefore, commercial centers are reasonable to save this extra cost. Moreover, all public centers offer a subsidy contract. 
+
+```{r , fig.cap = "\\label{fig:subsidy}Non-Profit Agency Offers the Most Child Care Subsidy to Parents", fig.height = 4, echo=FALSE, warning=FALSE, message=FALSE}
+subsidy_auspice <- child_care %>% 
+  group_by(AUSPICE)
+
+subsidy_auspice %>% 
+  ggplot(aes(x = AUSPICE, fill = SUBSIDY)) +
+  geom_histogram(binwidth = 1, stat = "count") +
+  labs(x = "Operating Auspices",
+       y = "Subsidies")
+
+```
+
+\newpage
+
+## Types of Building Where Child Care Centers are Located 
+
+I also look at the type of building that child care centers are located in. This is not directly related to capability of a child care center, but rather provides some supplementary information to us. Figure \@ref(fig:typebuilding) shows all types of building that child care centers in Toronto are located in. 
+
+It is worth noticing that although the operating auspices do not seem to have an obvious effect on what type of building that these centers are located in, there are still some patterns. For example, a large percentage of non-profit child care centers locate in public elementary school and Catholic elementary school. Commercial child care centers, in contrast, tend to locate in High Rise Apartment, House, Peace of Worship, or other locations. While non-profit centers choose to be located in almost every type of building listed in the data, the variation in type of building that a public child care center locates is very small. 
+
+\newpage
+
+```{r, fig.cap = "\\label{fig:typebuilding}Types of Building that Each Operating Auspice Tends to be Located", fig.height=4, echo=FALSE, warning=FALSE, message=FALSE}
+child_care %>% 
+  ggplot(aes(x = BUILDING_TYPE, fill = AUSPICE)) +
+  geom_bar(stat = "count") + 
+  theme(axis.text.x = element_text(angle = 90, size = 3)) +
+  labs(x = "Building Types",
+       y = "Count")
+```
+
+
+\newpage
+
+
+
+# References
+
+_Careless about child care: investigation into how the Ministry of Education responds to complaints and concerns relating to unlicensed daycare providers._ (2014). Ombudsman Ontario.
+
+_Licensed Child Care._ City of Toronto (official website). https://www.toronto.ca/community-people/children-parenting/children-programs-activities/licensed-child-care/
+
+_Child care rules in Ontario_. Government of Ontario. (2021).
+https://www.ontario.ca/page/child-care-rules-ontario#section-3
+
+Canadian Child Care Federation. (1993). Quality child care: Contextual factors. Ottawa: author.
+
+A sociological examination of the child care auspice debate. Friesen, Bruce K. (Bruce Kelly), 1958. 
+
